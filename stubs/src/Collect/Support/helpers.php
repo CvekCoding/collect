@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
+use Symfony\Component\PropertyAccess\PropertyAccess;
 use Symfony\Component\VarDumper\VarDumper;
 
 if (! class_exists(/*--- OLDNAMESPACE ---*/\Support\Collection::class)) {
@@ -55,35 +56,38 @@ if (! class_exists(/*--- OLDNAMESPACE ---*/\Support\Collection::class)) {
          */
         function data_get($target, $key, $default = null)
         {
-            if (is_null($key)) {
-                return $target;
-            }
+	        static $propertyAccessor;
 
-            $key = is_array($key) ? $key : explode('.', $key);
+	        if (null === $key) {
+		        return $target;
+	        }
 
-            while (($segment = array_shift($key)) !== null) {
-                if ($segment === '*') {
-                    if ($target instanceof Collection) {
-                        $target = $target->all();
-                    } elseif (! is_array($target)) {
-                        return value($default);
-                    }
+	        $propertyAccessor = $propertyAccessor ?? PropertyAccess::createPropertyAccessor();
+	        $key = is_array($key) ? $key : explode('.', $key);
 
-                    $result = Arr::pluck($target, $key);
+	        while (($segment = array_shift($key)) !== null) {
+		        if ($segment === '*') {
+			        if ($target instanceof \Tightenco\Collect\Support\Collection) {
+				        $target = $target->all();
+			        } elseif (! is_array($target)) {
+				        return value($default);
+			        }
 
-                    return in_array('*', $key) ? Arr::collapse($result) : $result;
-                }
+			        $result = \Tightenco\Collect\Support\Arr::pluck($target, $key);
 
-                if (Arr::accessible($target) && Arr::exists($target, $segment)) {
-                    $target = $target[$segment];
-                } elseif (is_object($target) && isset($target->{$segment})) {
-                    $target = $target->{$segment};
-                } else {
-                    return value($default);
-                }
-            }
+			        return in_array('*', $key, true) ? Arr::collapse($result) : $result;
+		        }
 
-            return $target;
+		        if (Arr::accessible($target) && Arr::exists($target, $segment)) {
+			        $target = $target[$segment];
+		        } elseif (is_object($target)) {
+			        $target = $propertyAccessor->getValue($target, $segment);
+		        } else {
+			        return value($default);
+		        }
+	        }
+
+	        return $target;
         }
     }
 

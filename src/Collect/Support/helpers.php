@@ -1,5 +1,6 @@
 <?php
 
+use Symfony\Component\PropertyAccess\PropertyAccess;
 use Tightenco\Collect\Support\Arr;
 use Tightenco\Collect\Support\Collection;
 use Symfony\Component\VarDumper\VarDumper;
@@ -55,10 +56,13 @@ if (! class_exists(Illuminate\Support\Collection::class)) {
          */
         function data_get($target, $key, $default = null)
         {
-            if (is_null($key)) {
+        	static $propertyAccessor;
+
+            if (null === $key) {
                 return $target;
             }
 
+            $propertyAccessor = $propertyAccessor ?? PropertyAccess::createPropertyAccessor();
             $key = is_array($key) ? $key : explode('.', $key);
 
             while (($segment = array_shift($key)) !== null) {
@@ -71,16 +75,16 @@ if (! class_exists(Illuminate\Support\Collection::class)) {
 
                     $result = Arr::pluck($target, $key);
 
-                    return in_array('*', $key) ? Arr::collapse($result) : $result;
+                    return in_array('*', $key, true) ? Arr::collapse($result) : $result;
                 }
 
-                if (Arr::accessible($target) && Arr::exists($target, $segment)) {
-                    $target = $target[$segment];
-                } elseif (is_object($target) && isset($target->{$segment})) {
-                    $target = $target->{$segment};
-                } else {
-                    return value($default);
-                }
+	            if (Arr::accessible($target) && Arr::exists($target, $segment)) {
+		            $target = $target[$segment];
+	            } elseif (is_object($target)) {
+		            $target = $propertyAccessor->getValue($target, $segment);
+	            } else {
+		            return value($default);
+	            }
             }
 
             return $target;
